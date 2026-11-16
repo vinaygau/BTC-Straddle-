@@ -1490,7 +1490,7 @@ def render_live_quotes_panel() -> None:
         )
 
     with st.container(border=True):
-        st.subheader("Selected pair risk", icon=":material/shield:")
+        st.subheader("Risk analyser", icon=":material/shield:")
         risk_key = (
             catalog.environment,
             call_contract.instrument_id,
