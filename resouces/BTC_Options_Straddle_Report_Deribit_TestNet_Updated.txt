@@ -1,0 +1,2126 @@
+BTC OPTIONS SHORT STRADDLE
+
+Assignment-Focused Implementation Report
+
+NautilusTrader + Deribit TestNet
+
+DETAILED PROBLEM STATEMENT
+
+The task is to build and execute a Bitcoin (BTC) at-the-money (ATM)
+short straddle using NautilusTrader connected to the Deribit exchange
+through its TestNet environment. The strategy must identify a valid BTC
+options Call and Put contract that share exactly the same strike price
+and expiry, then sell one Call and one Put to create the short straddle.
+The complete workflow must cover trading-system initialization, exchange
+connectivity, option-market-data subscriptions, instrument discovery,
+ATM contract selection, order submission, exchange acknowledgements,
+executions, and open-position tracking.
+
+Level 1 — Core short-straddle execution
+
+Set up and initialize NautilusTrader, configure the Deribit integration,
+and connect to Deribit TestNet.
+
+Subscribe to BTC options market data and discover the BTC option
+instruments available for trading.
+
+Obtain the BTC underlying reference price and compare it with available
+option strikes to determine the nearest ATM strike.
+
+Select the matching ATM Call and ATM Put. Both contracts must have
+exactly the same strike price and expiry, and must be active, valid, and
+tradable.
+
+Submit SELL orders for one Call and one Put. Track each leg
+independently through submission, acknowledgement/acceptance, partial
+execution, and final execution.
+
+Track resulting open positions using actual filled quantities and fill
+prices. Submission or acknowledgement alone must never be treated as an
+executed trade.
+
+Level 2 — Combined-premium risk management
+
+Extend Level 1 with continuous monitoring of the combined premium
+required to buy back the open Call and Put positions. Calculate buyback
+value using actual filled open quantities and current ask-side option
+quotes, applying contract multipliers and currency/denomination
+conversions consistently where required. Trigger a stop-loss when the
+combined buyback premium increases by 1% from the combined entry
+premium. Trigger a take-profit when the combined buyback premium
+decreases by 2% from the combined entry premium. When either condition
+is met, submit BUY-to-close orders for both open legs and track
+acknowledgements and executions until the positions are closed. Level 1
+itself must not contain stop-loss, take-profit, or automated exit
+conditions; these are Level 2 requirements only.
+
+Engineering and execution requirements
+
+The implementation must explain NautilusTrader initialization, Deribit
+configuration, market-data subscriptions and events, instrument
+discovery, ATM contract selection, order submission, order-state
+transitions, execution reports, and position tracking. It must also
+explain Level 2 threshold calculations and monitoring, partial-fill
+handling, and recovery when only one leg fills or the two legs fill in
+different quantities. Call and Put legs must be managed independently.
+Any unmatched exposure must be identified and handled safely; it must
+not be treated as a completed straddle. The system must prevent
+duplicate exit attempts and must not calculate risk using missing,
+stale, or invalid quotes.
+
+Expected outcome and scope
+
+The expected outcome is an explainable TestNet demonstration of the BTC
+ATM short straddle, with Level 1 execution and Level 2 risk controls
+clearly separated. The candidate should be able to describe the
+implementation, show order and position evidence, explain incomplete
+parts or errors, and discuss debugging steps taken. This is an
+exchange-connected options execution exercise; it does not require a
+price-prediction model, AI/ML forecasting system, historical research
+pipeline, or production live-money trading service. Development and
+demonstration must use Deribit TestNet. A short straddle can incur
+substantial losses if BTC moves sharply; the specified thresholds are
+execution rules, not guarantees against loss or slippage.
+
+Contents
+
+1.  Assignment objective and expected outcome
+
+2.  Short-straddle fundamentals
+
+3.  System architecture and execution flow
+
+4.  Project setup and configuration
+
+5.  Deribit connection and market data
+
+6.  BTC option discovery and ATM contract selection
+
+7.  Level 1 — short-straddle execution
+
+8.  Order and position lifecycle
+
+9.  Level 2 — automated risk management
+
+10. Partial fills and unmatched-leg handling
+
+11. Testing and validation plan
+
+12. Logging, error handling and safety
+
+13. Engineering walkthrough checklist
+
+14. Implementation phases and completion criteria
+
+15. Known limitations and assumptions
+
+16. Official references
+
+17. Detailed phase-wise implementation methodology (Phases 1–8)
+
+18. Improved event-driven market-data and execution flow
+
+19. Matched-quantity accounting and partial-fill rules
+
+20. Profit-aware execution quality
+
+21. Testing evidence and engineering walkthrough readiness
+
+22. Strategy state machine and recovery transitions
+
+23. Pre-trade account, margin and contract validation
+
+1–16. Assignment scope, strategy, architecture, configuration, market
+data, selection, execution, risk, testing and references
+
+17. Detailed phase-wise implementation methodology (Phases 1–8)
+
+18. Improved event-driven market-data and execution flow
+
+19. Matched-quantity accounting and partial-fill rules
+
+20. Profit-aware execution quality: assignment-compliant approach
+
+21. Testing evidence and engineering walkthrough readiness
+
+22. Assignment objective and expected outcome
+
+23. Short-straddle fundamentals
+
+24. System architecture and execution flow
+
+25. Project setup and configuration
+
+26. Deribit connection and market data
+
+27. BTC option discovery and ATM contract selection
+
+28. Level 1: short-straddle execution
+
+29. Order and position lifecycle
+
+30. Level 2: automated risk management
+
+31. Partial fills and unmatched-leg handling
+
+32. Testing and validation plan
+
+33. Logging, error handling and safety
+
+34. Engineering walkthrough checklist
+
+35. Implementation phases and completion criteria
+
+36. Known limitations and assumptions
+
+37. Official references
+
+38. Assignment Objective and Expected Outcome
+
+The assignment asks for a simple BTC ATM short-straddle strategy built
+with NautilusTrader and connected to Deribit. The system must discover
+BTC option instruments, identify the nearest ATM strike using a BTC
+reference price, select a Call and Put with the same strike and expiry,
+submit sell orders for both legs, and track order acknowledgements,
+executions and positions.
+
+The work is divided into two levels:
+
+The assignment also requires a live or recorded engineering walkthrough
+in which the candidate explains the complete execution flow. The
+supplied assignment says that no separate submission package is
+required; the implementation is demonstrated to the engineering team.
+
+2.  Short-Straddle Fundamentals
+
+A short straddle consists of selling a Call option and selling a Put
+option on the same underlying, with the same strike price and expiry. In
+this assignment, both contracts are BTC options.
+
+Short Call: the strategy receives a premium for selling the Call and may
+be required to buy it back or settle according to the contract.
+
+Short Put: the strategy receives a premium for selling the Put and may
+be required to buy it back or settle according to the contract.
+
+ATM: the strike closest to the selected BTC underlying reference price.
+
+Combined entry premium: the total premium actually received from the
+filled Call and Put quantities, calculated in consistent units.
+
+Buyback premium: the current estimated cost to close the short
+positions. For Level 2, use the ask-side quotes as required by the
+assignment.
+
+2.1 Basic payoff intuition
+
+The position benefits when the combined value of the two options falls
+after entry, because the options can potentially be bought back for less
+than the premium received. A sharp move in BTC can increase the value of
+one option and create losses. This report does not assume a guaranteed
+profit or a maximum loss for the short straddle.
+
+3.  System Architecture and Execution Flow
+
+High-level event flow:
+
+Start the NautilusTrader node and load the Deribit configuration.
+
+Connect to Deribit TestNet and make the required instrument definitions
+available.
+
+Subscribe to BTC reference-price data and the relevant BTC option
+quotes.
+
+Discover eligible Call and Put contracts and select a matching ATM pair.
+
+Submit a SELL order for each leg and process order acknowledgements and
+fills.
+
+Track actual filled quantities and resulting open positions.
+
+For Level 2 only, calculate the combined buyback premium continuously
+and close the positions when an exit threshold is reached.
+
+4.  Project Setup and Configuration
+
+Create a clean Python project and use a virtual environment. Before
+installing dependencies, check the Python version supported by the
+selected NautilusTrader release and follow the current official Deribit
+integration documentation. Pin tested package versions in
+requirements.txt.
+
+Suggested project structure:
+
+BTC_Options_Straddle/ ├── main.py ├── requirements.txt ├── .env.example
+├── .gitignore ├── README.md ├── config/ │ └── strategy.yaml ├── src/ │
+├── clients/ │ │ └── deribit_config.py │ ├── strategy/ │ │ ├──
+atm_selector.py │ │ └── short_straddle.py │ ├── risk/ │ │ └──
+straddle_risk.py │ └── utils/ │ └── logging_config.py └── tests/ ├──
+test_atm_selector.py └── test_straddle_risk.py
+
+Keep Deribit TestNet credentials in environment variables; Deribit
+provides a Client ID and Client Secret.
+
+Use Deribit TestNet Client ID and Client Secret for development and
+order execution. Keep the TestNet environment explicit and never fall
+back to production.
+
+Keep strategy parameters in configuration rather than scattering
+constants through the code.
+
+Record the Python and NautilusTrader versions used for the
+demonstration.
+
+4.1 Configuration items
+
+Deribit TestNet credential note: create a dedicated API key in the
+Deribit TestNet account. Store the Client ID and Client Secret in a
+local .env file excluded from version control, for example
+DERIBIT_TESTNET_CLIENT_ID and DERIBIT_TESTNET_CLIENT_SECRET. For
+development, grant account read access and trade read/write access only
+when order submission is being tested. Do not enable wallet withdrawal
+or transfer permissions. Confirm the exact permission labels and
+NautilusTrader configuration fields against the installed adapter
+version before connecting.
+
+4.2 Market-data module: what data/market_data.py will do
+
+In the current VS Code project structure, data/market_data.py will be
+the dedicated module for receiving and organizing market information. It
+will use the NautilusTrader Deribit data-client and instrument-provider
+mechanisms supported by the installed version. It is not a
+historical-dataset downloader, and the assignment does not require a
+separate historical BTC dataset.
+
+1.  Connect to the Deribit TestNet market-data service through the
+    configured NautilusTrader data client.
+
+2.  Discover/load the available BTC option instrument definitions and
+    retain the metadata needed for selection: instrument ID, Call/Put
+    type, strike, expiry, active status, tick size, lot size, minimum
+    quantity, multiplier and quote/settlement currency where supplied.
+
+3.  Obtain a fresh BTC underlying reference price from the documented
+    source and retain its timestamp. This price is used to determine
+    which eligible strike is nearest to ATM.
+
+4.  Subscribe to market data for the BTC reference instrument and the
+    shortlisted BTC option contracts. Maintain the latest bid, ask,
+    available sizes and event timestamps for each option.
+
+5.  Validate that the reference price and option quotes are present,
+    positive where applicable, and sufficiently fresh. Missing or stale
+    data must be marked unavailable, never treated as a zero price.
+
+6.  Provide the validated reference price, instrument metadata and
+    option quotes to strategies/atm_selection.py. The selector will
+    match Call and Put contracts by identical strike and expiry, then
+    choose the eligible pair nearest to the BTC reference price.
+
+7.  Continue updating option quotes for execution and, in Level 2 only,
+    combined buyback valuation. The risk module must use fresh ask-side
+    quotes for the actual open short quantities.
+
+The data flow is therefore: Deribit TestNet → NautilusTrader Deribit
+data client/instrument provider → data/market_data.py →
+strategies/atm_selection.py → strategies/short_straddle.py. The
+execution module separately submits orders and receives order/fill
+events. No local CSV dataset is required for this live-data workflow;
+small mocked data fixtures may still be used in unit tests.
+
+Implementation boundary: data/market_data.py should retrieve and
+normalize market data, not decide which strike to trade and not submit
+orders. ATM selection belongs in strategies/atm_selection.py; order
+submission belongs in execution/order_manager.py; Level 2 threshold
+calculations belong in strategies/risk_management.py.
+
+5.  Deribit Connection and Market Data
+
+Configure NautilusTrader’s Deribit integration using the current
+official integration guide. Initialize the data and execution clients
+for the same intended environment. For this assignment, use TestNet for
+order execution and demonstration.
+
+5.1 Market data needed
+
+Subscribe only to the data required by the selected contracts and
+strategy. Confirm that quotes are fresh and valid before using them. Do
+not treat a missing or stale quote as a zero price.
+
+6.  BTC Option Discovery and ATM Contract Selection
+
+The strategy must identify an eligible Call and Put pair. Use the
+following deterministic selection procedure:
+
+Obtain the BTC reference price from the documented source.
+
+Load the available BTC option instrument definitions.
+
+Filter to instruments for the intended underlying and supported option
+category.
+
+Separate Call and Put instruments and extract their strike and expiry
+metadata.
+
+Identify strike values available for both a Call and a Put at a common
+expiry.
+
+For each eligible common strike, calculate the absolute distance from
+the BTC reference price.
+
+Choose the strike with the smallest absolute distance; this is the
+nearest ATM strike.
+
+Choose the expiry using a documented deterministic policy, then select
+the Call and Put with exactly the same strike and expiry.
+
+Validate instrument status, quote availability, lot size, minimum
+quantity, tick size and contract multiplier before submitting orders.
+
+6.1 Selection formula
+
+ATM strike = argminₖ |K − BTC reference price|
+
+Here, K represents an eligible strike for which both Call and Put
+contracts exist at the selected expiry. If two strikes are equally
+close, define a consistent tie-breaking rule in the configuration or
+code and log the selected result.
+
+7.  Level 1 — Short-Straddle Execution
+
+Level 1 is the minimum required working strategy.
+
+Complete the instrument selection and validate both option contracts.
+
+Determine the configured order quantity and verify it is valid for each
+instrument.
+
+Submit a SELL order for the selected ATM Call.
+
+Submit a SELL order for the selected ATM Put.
+
+Track each order independently through submitted, accepted, rejected,
+partially filled and filled states, as applicable.
+
+Record actual execution prices and quantities for both legs.
+
+Confirm the resulting open positions using NautilusTrader’s position
+state.
+
+Continue observing market data and log position and market changes.
+
+7.1 Entry premium accounting
+
+Calculate entry premium from actual fills, not requested order prices.
+If an order is filled in multiple executions, aggregate the execution
+values using the actual filled quantities and the contract’s documented
+multiplier and currency conventions. Keep Call and Put accounting
+separate before calculating the combined total.
+
+Use the exchange and instrument specifications to determine whether the
+premium is quoted per unit, per contract or in another convention. Do
+not assume the Call and Put quantities or multipliers are
+interchangeable without checking the instrument definitions.
+
+8.  Order and Position Lifecycle
+
+Order status and position status are different. A successful order
+submission does not prove that the order was accepted or filled. The
+strategy must use execution events and position state as the source of
+truth.
+
+9.  Level 2 — Automated Risk Management
+
+Level 2 extends the Level 1 strategy. It continuously monitors the
+combined premium required to buy back both short options. The assignment
+specifies a 1% stop-loss and a 2% take-profit.
+
+9.1 Calculation
+
+Let:
+
+E = combined entry premium received for the actual filled quantities of
+both legs.
+
+B = current combined buyback cost, calculated using ask-side quotes and
+the actual open quantities.
+
+Stop-loss: B ≥ E × 1.01
+
+Take-profit: B ≤ E × 0.98
+
+Calculate B using the current ask-side quote for each leg, multiplied by
+the actual quantity still open and the correct contract multiplier or
+unit conversion. Ensure E and B use the same currency and valuation
+convention. If a leg has no open quantity, its buyback contribution is
+zero; do not include quantities that have already been closed.
+
+9.2 Exit execution
+
+Check that both leg quotes are valid and sufficiently fresh for
+valuation.
+
+Evaluate the combined buyback cost against the configured thresholds.
+
+When a threshold is crossed, set an exit-in-progress state before
+submitting closing orders.
+
+Submit BUY orders only for the remaining open short quantities of each
+leg.
+
+Track closing order acknowledgements, partial fills, rejections and
+final fills.
+
+Reconcile actual positions after execution and confirm that both legs
+are flat.
+
+Do not submit another exit set while an exit is already in progress;
+handle retries only after reconciling current order and position state.
+
+10. Partial Fills and Unmatched-Leg Handling
+
+The two legs are separate orders and may not execute at the same time or
+in the same quantity. The strategy must not assume that submitting both
+orders creates an atomic two-leg trade.
+
+10.1 Entry recovery procedure
+
+Track the Call and Put order and fill quantities independently.
+
+If one leg fills while the other is pending, continue monitoring the
+pending order for a configured, documented period or event condition.
+
+If the second leg is rejected, cancelled or remains unfilled beyond the
+configured policy, stop treating the pair as a completed straddle.
+
+Apply a predefined recovery action: cancel remaining unfilled quantity
+and close the filled exposure, or use another explicitly approved
+recovery procedure.
+
+Verify the final position state and record the reason and actions taken.
+
+For a safe first implementation, use a conservative recovery policy that
+closes the filled leg if the matching leg cannot be established. The
+policy must account for partial quantities and must not over-close a
+position.
+
+10.2 Exit recovery procedure
+
+If one closing order fills and the other does not, keep the exit state
+active and continue managing the remaining open exposure.
+
+If a closing order is rejected or partially filled, reconcile the actual
+open quantity before retrying.
+
+Never send a closing order for more than the remaining open position.
+
+Verify both positions are flat before marking the straddle as closed.
+
+11. Testing and Validation Plan
+
+Test the selection and risk calculations independently before sending
+orders. Then test the full event-driven flow on Deribit TestNet. Do not
+claim a test passed until it has actually been run and its output has
+been recorded.
+
+11.1 Suggested test layers
+
+Unit tests: ATM selection, matching expiry/strike, quantity calculations
+and SL/TP thresholds.
+
+Event-handling tests: accepted, rejected, partial-fill and fill
+sequences.
+
+Integration tests: Deribit TestNet connection, instrument discovery,
+market-data subscription and order lifecycle.
+
+Demonstration test: run the strategy in TestNet and capture logs showing
+the selected pair, order states, fills and positions.
+
+Where the exchange or test environment cannot reliably produce a
+particular event, use controlled unit or simulated event tests and
+clearly label them as simulations rather than live TestNet evidence.
+
+12. Logging, Error Handling and Safety
+
+Log timestamps in UTC and include the instrument ID, order ID, client
+order ID and strategy state where available.
+
+Log the BTC reference price, eligible strikes, selected expiry, selected
+Call/Put IDs and the reason for selection.
+
+Log order submission, acknowledgement, rejection, fill quantity, fill
+price and position changes.
+
+For Level 2, log E, each leg’s ask-side buyback value, B, threshold
+values and exit decision.
+
+Handle API errors, disconnections, missing instruments, stale quotes and
+rejected orders without silently continuing.
+
+On restart or reconnect, reconcile open orders and positions before
+submitting new entry orders.
+
+Use a configurable strategy state so that a restart cannot accidentally
+create a second straddle.
+
+Keep credentials out of logs, source code and version control.
+
+13. Engineering Walkthrough Checklist
+
+Prepare to explain and demonstrate the ten questions listed in the
+assignment:
+
+How does NautilusTrader start and initialize?
+
+How is the Deribit integration configured?
+
+How does NautilusTrader receive market data?
+
+How are BTC option instruments identified and subscribed to?
+
+How does the strategy receive market-data events?
+
+How are orders submitted to Deribit?
+
+How does the system know whether an order was accepted or executed?
+
+How are positions tracked?
+
+How are the Stop-Loss and Take-Profit implemented?
+
+What happens when one leg executes but the other does not?
+
+For the walkthrough, show the source code, the configuration, the
+TestNet connection, the selected Call/Put pair, order lifecycle logs,
+position state and (if Level 2 is implemented) the risk-trigger and
+closing-order flow. Be ready to explain what is complete, what is
+incomplete and what debugging you attempted.
+
+14. Implementation Phases and Completion Criteria
+
+Recommended implementation order: make the smallest complete Level 1
+flow work first. Add Level 2 only after entry execution, fill accounting
+and position tracking are reliable.
+
+15. Known Limitations and Assumptions
+
+The assignment does not require a one-year historical dataset, model
+training, price forecasting or an AI agent architecture.
+
+The assignment does not require a dashboard, cloud deployment,
+production monitoring platform or live-trading deployment.
+
+The assignment does not prescribe an expiry-selection rule or a fixed
+contract quantity; document the chosen policy and validate it against
+instrument metadata.
+
+Market data availability, instrument identifiers and supported order
+types depend on the current Deribit integration and exchange
+environment.
+
+The implementation must use current NautilusTrader and Deribit
+documentation because API and configuration details can change between
+versions.
+
+TestNet behaviour and liquidity may differ from mainnet. TestNet results
+do not establish live execution quality or profitability.
+
+Level 1 intentionally has no automated exits. Level 2 adds only the
+specified combined-premium stop-loss and take-profit logic.
+
+16. Official References
+
+NautilusTrader documentation: https://nautilustrader.io/docs/latest/
+
+NautilusTrader Deribit integration:
+https://nautilustrader.io/docs/latest/integrations/deribit/
+
+NautilusTrader GitHub repository:
+https://github.com/nautechsystems/nautilus_trader
+
+Investopedia — Straddle:
+https://www.investopedia.com/terms/s/straddle.asp
+
+Deribit TestNet: https://test.deribit.com/
+
+Deribit API documentation: https://docs.deribit.com/
+
+End of assignment-focused report
+
+17. Detailed Phase-Wise Implementation Methodology
+
+This section expands the implementation plan into eight practical
+phases. Each phase includes the recommended method, detailed
+implementation steps, core logic, required inputs, expected outputs, and
+testing criteria. Complete the acceptance criteria of one phase before
+moving to the next.
+
+Phase 1 — Environment setup and project foundation
+
+Objective: Create a reproducible Python project, install a compatible
+NautilusTrader release, and make configuration and logging work before
+connecting to the exchange.
+
+Recommended method
+
+Use a clean virtual environment and pin the versions that are confirmed
+to work together. First verify the Python version supported by the
+selected NautilusTrader release and the Deribit integration. Install
+only the packages required for this assignment; avoid adding ML,
+forecasting or dashboard dependencies.
+
+Detailed implementation steps
+
+Create a dedicated project folder, for example BTC_Options_Straddle.
+Open that folder in VS Code and use its integrated PowerShell terminal.
+
+Check Python and pip versions with python --version and
+python -m pip --version. Confirm the interpreter path with
+python -c "import sys; print(sys.executable)".
+
+Create and activate a virtual environment: python -m venv .venv followed
+by .\.venv\Scripts\Activate.ps1 in PowerShell. If script execution is
+blocked, use the appropriate permitted PowerShell policy for the current
+user or run the environment’s Python executable directly.
+
+Consult the current NautilusTrader installation and Deribit integration
+documentation. Confirm supported Python version, installation extras and
+TestNet configuration for the exact release.
+
+Install the documented NautilusTrader package and only necessary
+supporting dependencies. Do not guess an obsolete package extra or mix
+incompatible package versions.
+
+Create a requirements or lock file after the environment installs
+successfully. Record the Python and NautilusTrader versions.
+
+Create the project modules and a minimal application entry point. Add
+structured logging and configuration loading.
+
+Add a startup validation routine that checks required settings exist
+without printing API secrets.
+
+Run a minimal import/startup check before moving to exchange
+connectivity.
+
+Core implementation logic
+
+Keep credentials outside source code, preferably in environment
+variables or a local .env file excluded from version control.
+
+Use separate TestNet API keys. Give the key only the permissions needed
+for the assignment; do not enable withdrawals.
+
+Validate required fields at startup: environment, API key, API secret,
+BTC underlying, expiry policy and contract quantity.
+
+Fail fast if required configuration is missing or invalid. Do not
+continue to instrument selection with incomplete configuration.
+
+Inputs and configuration
+
+Python interpreter and virtual environment are confirmed.
+
+NautilusTrader imports successfully under the chosen interpreter.
+
+Configuration loads and validation reports missing fields clearly.
+
+Logs are written without exposing API secrets.
+
+A minimal application starts and shuts down cleanly.
+
+Expected output / completion evidence
+
+Run a clean environment check from the activated virtual environment.
+
+Test missing credentials and invalid configuration; the program should
+stop with a clear message.
+
+Check that .env, credentials and local logs are not accidentally
+committed.
+
+Testing and acceptance criteria
+
+Do not assume the latest NautilusTrader version supports every Python
+version.
+
+Do not install random versions until imports fail; first inspect the
+official installation matrix.
+
+Do not hardcode API keys in Python files or paste them into screenshots
+or logs.
+
+Phase 2 — Configure and connect to Deribit TestNet
+
+Objective: Establish authenticated connectivity to Deribit TestNet
+through NautilusTrader and confirm that the application can access the
+exchange services needed for market data and execution.
+
+Recommended method
+
+Use the official NautilusTrader Deribit integration and its documented
+client configuration. Keep the data-client and execution-client
+configuration consistent with the same TestNet environment. Validate
+connectivity before enabling strategy execution.
+
+Detailed implementation steps
+
+Load DERIBIT_TESTNET_CLIENT_ID, DERIBIT_TESTNET_CLIENT_SECRET and the
+TestNet selection from configuration.
+
+Create the NautilusTrader trading node or equivalent runtime using the
+setup prescribed by the installed NautilusTrader release.
+
+Configure the Deribit data client for TestNet and the Deribit execution
+client for TestNet. Use the exact documented configuration class names
+and fields for the installed release.
+
+Register the required client factories and connect the node to the
+Deribit venue.
+
+Start the runtime and wait for connection and authentication status.
+Treat connection establishment and successful authentication as separate
+checks.
+
+Record connection status, venue identity and timestamps in logs. Never
+log the API secret or full signed request.
+
+Add bounded retry/backoff for transient connection failures. Do not
+create repeated uncontrolled reconnect loops.
+
+On shutdown, stop strategy activity, cancel or reconcile outstanding
+orders as appropriate, disconnect clients and release runtime resources.
+
+Core implementation logic
+
+TestNet must be explicitly selected; do not silently fall back to
+mainnet.
+
+Use one consistent venue identifier across instrument IDs, subscriptions
+and order requests.
+
+Do not submit orders just because a socket connected. Require the
+expected authenticated execution client and valid account/session state.
+
+Handle authentication failure, network timeout, rate limit and exchange
+maintenance as distinct errors.
+
+Make connection state visible to the strategy so it can block entries
+while disconnected.
+
+Inputs and configuration
+
+Logs confirm connection to Deribit TestNet.
+
+Authentication succeeds with the configured test credentials.
+
+Market-data and execution clients report ready states, where supported
+by the integration.
+
+An intentional disconnect and reconnect can be handled without duplicate
+strategy startup.
+
+Expected output / completion evidence
+
+Test invalid API key and invalid secret; authentication must fail
+safely.
+
+Test network interruption; new entries must be blocked while
+disconnected.
+
+Verify the venue/environment in logs and configuration before any order
+test.
+
+Testing and acceptance criteria
+
+Never use live API credentials for this assignment’s demonstration.
+
+Do not infer that a connected market-data client means the execution
+client is authenticated.
+
+Do not submit real orders as a connectivity test; use the TestNet
+account and a deliberate test procedure.
+
+Phase 3 — Subscribe to BTC reference data and discover option
+instruments
+
+Objective: Obtain a valid BTC reference price and a current list of
+eligible BTC option contracts, including strike, expiry, option type and
+trading constraints.
+
+Recommended method
+
+Use NautilusTrader’s instrument-provider and market-data subscription
+mechanisms supported by the Deribit integration. Discover the exchange’s
+listed instruments first, then subscribe only to the specific
+instruments needed. Avoid guessing instrument identifiers.
+
+Detailed implementation steps
+
+Request or load the current instrument catalogue from the Deribit venue
+using the supported instrument-provider workflow.
+
+Filter the catalogue to BTC options. Exclude non-BTC underlyings,
+expired contracts, inactive instruments and instruments that cannot
+currently be traded.
+
+Extract the instrument identifier and metadata for each candidate:
+option type (Call/Put), strike, expiry, quote/base currency, settlement
+currency, multiplier, price precision, quantity precision, minimum
+quantity, lot size and tick size, where supplied.
+
+Choose the BTC reference-price source required by the integration and
+assignment. Subscribe to it or obtain a fresh snapshot. Record the
+source and timestamp.
+
+Subscribe to market data for eligible option contracts, or first
+shortlist by expiry/strike and then subscribe to the smaller candidate
+set.
+
+Maintain the latest bid, ask, sizes and event timestamps for each
+subscribed option. Distinguish a missing quote from a zero price.
+
+Reject stale, crossed or incomplete quotes according to a documented
+freshness policy.
+
+Refresh instrument metadata when required by the venue/integration and
+handle listing or expiry changes.
+
+Core implementation logic
+
+Instrument discovery is not the same as subscribing to quotes: both
+stages must be completed.
+
+Use exchange-provided metadata as the source of truth for contract
+identifiers and trading increments.
+
+Keep the BTC reference price separate from option premium quotes. The
+underlying reference is used for ATM selection; option bid/ask is used
+for execution valuation.
+
+Timestamp market data and define a maximum acceptable age. Do not select
+a contract using stale quotes.
+
+Use a deterministic and logged filter so the selected universe can be
+explained during the engineering walkthrough.
+
+Inputs and configuration
+
+A list of eligible BTC Call and Put instruments is available.
+
+Each candidate has a parsed strike and expiry, or is rejected with a
+clear reason if metadata is incomplete.
+
+A fresh BTC reference price is available.
+
+Fresh bid/ask quotes can be observed for the shortlisted contracts.
+
+Expected output / completion evidence
+
+Test filtering with expired and inactive instruments.
+
+Test an instrument with missing strike/expiry metadata; it must be
+excluded.
+
+Test stale or missing quotes; the selector must not treat them as valid
+tradable prices.
+
+Compare a sample instrument’s metadata against the exchange’s TestNet
+instrument details.
+
+Testing and acceptance criteria
+
+Do not build instrument IDs manually from a guessed naming pattern.
+
+Do not assume every listed instrument is active or has a valid order
+book.
+
+Do not use the option premium as the BTC underlying reference price.
+
+Phase 4 — Select the ATM Call and Put with matching expiry
+
+Objective: Select one eligible Call and one eligible Put that have the
+same strike and expiry, with the strike closest to the BTC reference
+price.
+
+Recommended method
+
+Use a deterministic ATM-selection algorithm over the live instrument
+catalogue. Apply eligibility checks before ranking. If multiple expiries
+are listed, choose the expiry using a documented assignment-compatible
+policy, such as the nearest eligible future expiry with sufficient time
+remaining and available quotes. The precise expiry rule must be
+configured and logged rather than left implicit.
+
+Detailed implementation steps
+
+Capture one BTC reference price with its timestamp and source.
+
+Build the eligible Call set and eligible Put set from the discovered
+instruments. Keep only future expiries and active/tradable contracts.
+
+Create matched pairs by joining Call and Put instruments on exactly the
+same strike and expiry.
+
+Remove pairs where either leg has missing/stale quotes, invalid tick/lot
+metadata, or fails minimum quantity checks.
+
+Apply the configured expiry policy to choose the expiry group. Do not
+compare a Call from one expiry with a Put from another.
+
+Within the selected expiry group, calculate the absolute distance
+between each available strike and the BTC reference price.
+
+Choose the strike with the smallest absolute distance. If two strikes
+are equally close, apply a deterministic tie-break rule (for example,
+lower strike) and log it.
+
+Select the Call and Put instruments for that exact strike and expiry.
+
+Run a final pre-trade validation and store the selected pair as one
+strategy candidate.
+
+Core implementation logic
+
+ATM selection formula: K* = argmin_K |K - S|, where S is the BTC
+reference price and K is an available strike.
+
+Pair constraint: Call.strike = Put.strike and Call.expiry = Put.expiry.
+
+Eligibility constraint: both instruments must be active, future-dated,
+supported by the venue, and pass quote and quantity checks.
+
+Do not choose the Call and Put independently by nearest strike; pair
+them first on identical strike and expiry.
+
+Record reference price, reference timestamp, candidate strikes, chosen
+expiry, chosen strike and rejection reasons.
+
+Inputs and configuration
+
+BTC reference price and timestamp.
+
+Option instrument catalogue and parsed option metadata.
+
+Configured expiry policy, quote-freshness limit and desired order
+quantity.
+
+Venue-provided tick size, lot size, minimum quantity and contract
+multiplier.
+
+Expected output / completion evidence
+
+Exactly one selected Call and one selected Put are produced.
+
+Both legs have identical strike and expiry.
+
+The selected strike is the closest eligible strike to the BTC reference
+price, subject to the documented tie-break.
+
+A selection report/log explains why this pair was chosen.
+
+Testing and acceptance criteria
+
+Use a small mock catalogue to test ATM selection with a strike exactly
+at BTC price.
+
+Test BTC price between two strikes and confirm the nearest strike wins.
+
+Test equal-distance strikes and confirm deterministic tie-break.
+
+Test mismatched expiry and missing-leg cases; no invalid pair should be
+returned.
+
+Common mistakes to avoid
+
+Do not hardcode one strike or one expiry.
+
+Do not pair contracts that merely have similar expiry labels; compare
+normalized expiry values.
+
+Do not proceed if only one side of the straddle is available.
+
+Phase 5 — Level 1: submit the two SELL orders
+
+Objective: Execute the assignment’s short ATM straddle by submitting a
+SELL order for the selected Call and a SELL order for the selected Put,
+with the same configured quantity and validated contract terms.
+
+Recommended method
+
+Implement entry as a controlled two-leg state machine. Validate both
+legs before submitting either order. Submit the orders using
+NautilusTrader’s supported order factory and execution API. For the
+first safe implementation, use the order type and time-in-force
+permitted by the assignment and the exchange integration; do not
+silently change the requested execution style.
+
+Detailed implementation steps
+
+Confirm the strategy is in an idle/ready state, the venue is connected,
+the selected pair is still valid and no existing straddle is open.
+
+Refresh both option quotes and verify their timestamps, bid/ask validity
+and available liquidity immediately before order submission.
+
+Calculate the order quantity using the exchange’s minimum quantity, lot
+size and contract multiplier. Normalize quantity to the permitted
+increment and reject a quantity below the minimum.
+
+Validate both legs’ tick sizes, quantity precision, trading status and
+available margin/risk constraints where the venue exposes them.
+
+Create a SELL order for the Call and a SELL order for the Put using the
+selected instrument IDs and configured order quantity.
+
+Submit the first order and record its client order ID and submission
+time. Submit the second leg according to the chosen two-leg execution
+policy and record its ID.
+
+Listen for order events rather than assuming submission means
+acceptance. Track submitted, accepted, rejected, partially filled,
+filled, canceled and expired states.
+
+Capture every fill separately: instrument, side, quantity, fill price,
+commission/fee, liquidity information if available and timestamp.
+
+Calculate entry premium from actual filled quantities and execution
+prices, applying the contract multiplier and currency rules from the
+instrument metadata.
+
+Do not mark the straddle fully established until the system has
+reconciled both legs and knows the actual open quantity on each.
+
+Core implementation logic
+
+Side must be SELL for both the Call and Put legs.
+
+Use the same intended quantity for both legs, but track actual filled
+quantities independently.
+
+Submitted order price is not the same as execution price. Premium
+received must be based on fill events.
+
+Use a leg state for each contract and a combined strategy state, such as
+PREPARING, ENTRY_WORKING, OPEN, PARTIALLY_OPEN, ENTRY_FAILED and
+EXITING.
+
+Prevent a second entry while an entry is working, a position is open, or
+reconciliation is incomplete.
+
+Keep Level 1 separate from Level 2: Level 1 does not include automatic
+stop-loss or take-profit.
+
+Inputs and configuration
+
+Two SELL orders are submitted for the matched Call and Put.
+
+Order acknowledgements and subsequent order events are recorded.
+
+Actual fills and open quantities are known independently for each leg.
+
+The system reports whether the straddle is fully open, partially open or
+failed.
+
+Expected output / completion evidence
+
+Test both orders accepted and fully filled.
+
+Test one leg rejected and the other accepted or filled.
+
+Test partial fill on one or both legs.
+
+Test duplicate start signal; only one entry pair may be submitted.
+
+Verify the system does not report an open position merely because orders
+were submitted.
+
+Testing and acceptance criteria
+
+Do not treat order submission or acknowledgement as a fill.
+
+Do not assume the two legs fill simultaneously.
+
+Do not calculate entry premium from the last traded price or requested
+limit price when actual fills are available.
+
+Do not start automatic Level 2 exits in the Level 1-only milestone.
+
+Phase 6 — Order lifecycle, positions and unmatched-leg recovery
+
+Objective: Maintain an accurate view of order status and actual
+positions for each option leg, and handle partial fills, rejection,
+cancellation, disconnection and unmatched exposure safely.
+
+Recommended method
+
+Use NautilusTrader order/position events as the primary event stream and
+reconcile against the venue’s current open orders and positions when
+starting, reconnecting or detecting a state mismatch. Keep an auditable
+state record for both legs.
+
+Detailed implementation steps
+
+Create an order-event handler that maps each event to the relevant Call
+or Put leg using the client order ID and instrument ID.
+
+Update cumulative filled quantity using fill events; do not overwrite
+cumulative quantity with the latest partial fill quantity.
+
+Track open position quantity and average fill price for each instrument
+using the platform’s position model and exchange reconciliation.
+
+Represent the Call and Put leg separately. Track order state, filled
+quantity, remaining order quantity, average fill price and current open
+quantity.
+
+Define an unmatched-leg policy before enabling live order submission. If
+one leg fills and the other is rejected or remains unfilled beyond the
+configured timeout, cancel any remaining entry order and reduce/close
+the filled exposure according to the conservative recovery procedure.
+
+After recovery orders, wait for their execution events and verify actual
+position quantities. Do not assume that sending a close order made the
+position flat.
+
+On disconnect/restart, pause new entries, reconnect, retrieve open
+orders and positions, reconcile local state, then decide whether the
+strategy may resume.
+
+Write a concise event log with timestamps, instrument IDs, order IDs,
+event types, quantities and prices.
+
+Core implementation logic
+
+Partial fill: only the filled quantity creates position exposure; the
+unfilled remainder is still an order, not a position.
+
+Unmatched leg: a filled Call with no corresponding Put (or vice versa)
+is directional exposure, not a complete straddle.
+
+Conservative recovery: cancel remaining entry orders and close the
+filled quantity if the missing leg cannot be established safely within
+the configured policy.
+
+Exit/recovery orders must themselves be tracked for partial fills and
+rejection.
+
+Use idempotent handlers so replayed or duplicate events do not
+double-count fills.
+
+On restart, exchange state takes precedence over stale in-memory
+assumptions; reconcile before resuming.
+
+Inputs and configuration
+
+Per-leg order and position state is available.
+
+Partial fills are represented accurately.
+
+Unmatched exposure triggers the documented recovery path.
+
+Reconnect/restart reconciliation blocks new entries until state is
+consistent.
+
+Expected output / completion evidence
+
+Simulate a Call fill with Put rejection and verify recovery.
+
+Simulate partial fill then cancellation and verify residual quantity.
+
+Replay a duplicate fill event and verify it is not counted twice.
+
+Disconnect while an order is working; reconnect and reconcile open
+orders and positions.
+
+Verify the system reaches a confirmed flat state after recovery.
+
+Testing and acceptance criteria
+
+Do not equate an order’s remaining quantity with an open position.
+
+Do not blindly resubmit an order after reconnect; first query exchange
+state.
+
+Do not mark a leg closed until the close execution and position
+reconciliation confirm it.
+
+Phase 7 — Level 2: combined-premium stop-loss and take-profit
+
+Objective: Monitor the combined cost of buying back the actual open Call
+and Put quantities and close both legs when the assignment’s 1%
+stop-loss or 2% take-profit threshold is reached.
+
+Recommended method
+
+Implement one combined risk monitor that evaluates both legs from
+current executable ask-side quotes. Calculate the entry reference from
+actual fills and the live buyback value from actual remaining short
+quantities. Use consistent units, multipliers and currencies throughout.
+
+Detailed implementation steps
+
+Enable this phase only after Level 1 order and position tracking is
+reliable.
+
+At entry completion, calculate and store the combined entry premium E
+from actual Call and Put fills. If the legs fill at different times or
+in different quantities, calculate the reference using the actual filled
+quantities and the chosen documented aggregation convention.
+
+On each valid market-data update or risk-monitor cycle, retrieve the
+latest ask quote for each short option leg.
+
+Check quote freshness, positive price, available size where provided,
+instrument multiplier and currency consistency. If a quote is invalid or
+stale, mark the risk valuation unavailable and do not interpret it as
+zero.
+
+Calculate the estimated buyback cost B for each leg using its ask-side
+quote, actual open quantity and contract multiplier; combine the two leg
+values in a common currency.
+
+Calculate stop-loss threshold SL = E × 1.01 and take-profit threshold
+TP = E × 0.98.
+
+If B >= SL, trigger the stop-loss. If B <= TP, trigger the take-profit.
+If neither is true, continue monitoring.
+
+When a threshold is triggered, atomically change strategy state to
+EXITING before sending any close order. This prevents duplicate exit
+attempts from repeated market-data events.
+
+Cancel any outstanding entry orders and submit buy-to-close orders for
+the actual open quantity of each short leg.
+
+Track close orders and partial fills. Recalculate residual open
+quantities and submit only the remaining quantity if the documented
+order policy allows it.
+
+Verify both positions are flat from execution events and position
+reconciliation. Record trigger reason, threshold, observed buyback
+value, quotes and final execution prices.
+
+After a completed exit, mark the strategy cycle CLOSED and require a
+fresh explicit start condition before opening another straddle.
+
+Core implementation logic
+
+E is the combined entry premium received for the actual filled
+quantities, converted to one consistent currency and unit.
+
+B is the estimated combined cost to buy back the actual currently open
+quantities, using ask-side prices because the strategy must buy to close
+short options.
+
+Stop-loss: B >= E × 1.01 (buyback cost has increased by 1% from entry
+reference).
+
+Take-profit: B <= E × 0.98 (buyback cost has decreased by 2% from entry
+reference).
+
+Apply the contract multiplier and quantity correctly. Do not compare a
+per-contract premium with a total-position premium.
+
+Use a consistent definition for fees: if entry premium excludes fees,
+the trigger reference should also exclude fees; separately report
+estimated/realized fees. Document the convention.
+
+Use a single exit lock/state transition to prevent duplicate close
+orders.
+
+Risk monitoring must not run on stale, missing or invalid quotes. Log
+the valuation as unavailable and apply the configured safe behavior.
+
+Inputs and configuration
+
+Actual entry fills for both legs and their quantities.
+
+Current open quantity for each leg.
+
+Fresh ask-side quotes for both options.
+
+Instrument multipliers and currency/settlement metadata.
+
+Configured thresholds: 1% stop-loss and 2% take-profit.
+
+Expected output / completion evidence
+
+Combined entry reference E is stored and auditable.
+
+Combined buyback estimate B is calculated from fresh ask-side quotes and
+actual open quantities.
+
+Stop-loss and take-profit conditions are evaluated exactly as defined.
+
+Only one exit sequence is initiated for a trigger.
+
+Both legs are bought back and confirmed flat, or the system reports the
+remaining exposure and error clearly.
+
+Testing and acceptance criteria
+
+Unit test values: if E = 100, stop-loss threshold is 101 and take-profit
+threshold is 98.
+
+Test B = 100.99 (no stop-loss), B = 101 (stop-loss triggers), B = 98
+(take-profit triggers), and values between thresholds.
+
+Test one leg quote stale or missing; valuation must be unavailable
+rather than zero.
+
+Test partial close on one leg and verify only the residual open quantity
+is closed.
+
+Test repeated threshold events; only one exit sequence should be
+submitted.
+
+Test that a completed exit is verified by zero open quantities for both
+instruments.
+
+Common mistakes to avoid
+
+Do not reverse the comparisons: the stop-loss is triggered when buyback
+cost rises; take-profit when it falls.
+
+Do not use bid quotes to value a buy-to-close order; use ask-side
+quotes.
+
+Do not multiply quantity or contract multiplier twice.
+
+Do not use requested order prices as actual exit results.
+
+Do not claim that a trigger guarantees the exact fill price; market
+conditions and slippage can change execution.
+
+Phase 8 — End-to-end testing, TestNet demonstration and handover
+
+Objective: Demonstrate that the complete strategy works safely on
+Deribit TestNet, from startup and instrument selection through entry,
+monitoring, exit and final position reconciliation.
+
+Recommended method
+
+Use a test pyramid: unit tests for deterministic selection and
+calculations, integration tests for NautilusTrader event handling and
+exchange connectivity, and a controlled TestNet run for the complete
+workflow. Keep the strategy disabled by default until all pre-trade
+checks pass.
+
+Detailed implementation steps
+
+Write unit tests for configuration validation, instrument filtering,
+matched-pair creation, ATM strike selection and tie-break behavior.
+
+Write unit tests for quantity normalization, tick-size validation,
+premium calculations, multiplier conversion, stop-loss and take-profit
+conditions.
+
+Write event-handler tests for accepted, rejected, partially filled,
+filled, canceled and duplicate events.
+
+Write integration tests for Deribit TestNet connectivity, instrument
+discovery, subscriptions and order lifecycle using the supported
+NautilusTrader integration.
+
+Run a controlled TestNet entry with a deliberately small permitted
+quantity after confirming both legs, expiry, strike, account and order
+parameters.
+
+Observe and record order acknowledgements, fills, position quantities
+and premium calculations. If Level 2 is enabled, verify the risk monitor
+using controlled test inputs or a safe simulation; do not rely on
+waiting for market prices to hit thresholds.
+
+Test the recovery path for one-sided fills and test restart/reconnect
+reconciliation.
+
+At the end of each run, verify open orders and positions at the venue.
+Cancel leftover orders and close residual positions according to the
+test procedure.
+
+Prepare a demonstration log and a short walkthrough explaining the
+architecture, ATM selection, two-leg execution, order events, actual
+fills, unmatched-leg recovery and Level 2 formula.
+
+Record known limitations and any incomplete behavior honestly. Do not
+present untested functionality as complete.
+
+Core implementation logic
+
+Use TestNet only for the assignment demonstration.
+
+Do not run a new entry if there are unresolved orders, non-zero
+positions from an earlier run, stale market data or an incomplete
+reconciliation.
+
+Use test fixtures to verify risk thresholds rather than attempting to
+manipulate live market conditions.
+
+Keep a clear separation between automated strategy logic and manual
+emergency controls.
+
+Store a run identifier so logs from each test can be correlated.
+
+Expected output / completion evidence
+
+Unit and integration test results are recorded.
+
+A TestNet run demonstrates matched Call/Put selection and SELL order
+lifecycle.
+
+Actual fills and positions are reconciled correctly.
+
+Level 2 threshold calculations and exit state machine pass controlled
+tests.
+
+At completion, the TestNet account has no unintended open orders or
+positions from the test run.
+
+A clear engineering walkthrough and limitations list are ready.
+
+Testing and acceptance criteria
+
+Test no instruments found, one missing leg, stale quote, exchange
+disconnect, order rejection and partial fill.
+
+Test repeated application start and restart while a position exists.
+
+Verify logs include enough detail to reconstruct the strategy decisions.
+
+Confirm secrets are not present in logs, source control or demonstration
+screenshots.
+
+Common mistakes to avoid
+
+Do not test the strategy on a live account to prove that the code works.
+
+Do not claim the system is fully automated if manual recovery is still
+required.
+
+Do not hide rejected orders, unmatched exposure or incomplete exits from
+the walkthrough.
+
+18. Improved Event-Driven Market-Data and Execution Flow
+
+This section makes the event flow explicit because the engineering team
+may ask how market data reaches the strategy, how orders are
+acknowledged, and how fills become positions. NautilusTrader is
+event-driven: the strategy should react to the events delivered by the
+configured data and execution clients instead of repeatedly assuming
+that a request succeeded.
+
+18.1 Market-data event path
+
+Subscribe to the BTC reference-price source and the selected option
+instruments using the APIs supported by the installed NautilusTrader
+version.
+
+When a BTC reference update arrives, store its value, source and event
+timestamp. The ATM selector uses this value together with the currently
+available strikes.
+
+When an option quote update arrives, update the corresponding
+instrument’s bid, ask, sizes and timestamp. Keep Call and Put quote
+state separate.
+
+Reject or mark unavailable any quote that is stale, missing, crossed,
+non-positive or lacks the data needed for the configured valuation.
+
+Do not calculate buyback value from a last-traded price when the
+assignment specifically requires ask-side quotes.
+
+18.2 Order and execution event path
+
+Order submitted means the application sent the request; it does not
+prove the exchange accepted it.
+
+Order accepted means the venue acknowledged the order; it does not prove
+any quantity has executed.
+
+A fill event reports an executed quantity and price. Accumulate fills
+without counting duplicate events twice.
+
+The position tracker must use actual executed quantities and the
+venue/platform position state, not the order’s requested quantity.
+
+On reconnect or restart, reconcile outstanding orders and positions with
+the venue before permitting another entry.
+
+19. Matched-Quantity Accounting and Partial-Fill Rules
+
+The assignment requires combined premium valuation using both legs with
+consistent contract quantities. This is especially important when the
+Call and Put fill at different times or in different quantities.
+
+19.1 Entry quantities
+
+If qC equals qP, the full open quantity is matched.
+
+If qC and qP differ, only the smaller common quantity is a matched
+straddle. The excess quantity on the other leg is unmatched directional
+exposure.
+
+Do not label the strategy fully established while unmatched exposure
+remains. Apply the documented recovery policy: cancel remaining entry
+orders and close or otherwise safely resolve the unmatched residual.
+
+For the assignment’s combined-straddle risk calculation, compare
+like-for-like quantities on both legs. Do not add a full Call position
+to a smaller Put position and describe the result as a balanced
+straddle.
+
+19.2 Combined entry premium and buyback value
+
+If there are multiple fills at different prices, calculate a
+quantity-weighted average fill price for each leg, or sum the individual
+fill values directly. The method must preserve the same quantity basis
+for E and B. Fees should be reported separately or included consistently
+in both the entry and exit comparison; do not mix conventions.
+
+19.3 Example: unequal fills
+
+In this example, two Call contracts and two Put contracts form the
+matched straddle. One extra short Call remains unmatched and must be
+handled by the recovery procedure. It must not be ignored or hidden
+inside the combined premium.
+
+19.4 Rebase the risk reference after partial exits
+
+Critical rule: the entry reference and current buyback value must always
+use the same remaining matched quantity. If part of either leg has been
+closed, do not compare the residual position’s buyback cost with the
+original full-size entry premium. Recalculate the matched residual
+quantity and the entry-premium basis attributable to that quantity. Any
+unmatched residual is separate directional exposure and must be handled
+by the recovery policy.
+
+Let qC and qP be the current open short quantities and qM = min(qC, qP).
+Allocate the original Call and Put entry fills to the remaining matched
+quantity using the original fill prices and contract multipliers.
+Calculate E_remaining as the entry premium attributable to qM on both
+legs. Calculate B_remaining from current ask-side buyback values for qM
+on both legs. Compare B_remaining with E_remaining × 1.01 and
+E_remaining × 0.98. If account netting or position aggregation changes
+the apparent quantities, reconcile the execution ledger and venue
+position before evaluating the trigger.
+
+Do not simply use min(qC, qP) with an unadjusted original E after
+quantities have changed. Store closed quantities, close fills and
+remaining entry basis per leg. Do not assume a partial close occurred at
+the entry price.
+
+qM = min(current_open_call_qty, current_open_put_qty) E_remaining =
+entry_value_of_remaining_matched_call +
+entry_value_of_remaining_matched_put B_remaining =
+ask_buyback_value_for_qM_call + ask_buyback_value_for_qM_put SL =
+E_remaining × 1.01 TP = E_remaining × 0.98
+
+Evaluate only when both matched legs have valid fresh ask quotes and
+consistent currency/contract units.
+
+20. Profit-Aware Execution Quality: Assignment-Compliant Approach
+
+There is no guaranteed highest-profit short-straddle configuration. The
+assignment fixes the core strategy: sell the nearest ATM Call and Put
+with the same strike and expiry. The improvements below aim to avoid
+poor entries, reduce avoidable execution costs and improve the quality
+of the trade without changing that required strategy.
+
+20.1 Keep the required strategy unchanged
+
+The selected strike must remain the nearest eligible strike to the BTC
+reference price. Do not move to a farther strike merely because it
+offers a larger premium.
+
+The Call and Put must have exactly the same strike and expiry.
+
+Level 1 must remain free of automated stop-loss, take-profit and exit
+conditions, as stated in the assignment.
+
+Level 2 must use the specified 1% stop-loss and 2% take-profit based on
+the combined entry premium and combined buyback value.
+
+20.2 Pre-trade quality filters
+
+Apply these as safety and execution-quality checks to the required ATM
+pair. If the nearest ATM pair fails a check, do not silently substitute
+a different strike. Wait for valid data, refresh the pair, or report
+that no trade is currently suitable.
+
+20.3 Entry execution method
+
+Prefer a controlled limit-order policy where supported. A sell limit
+sets the minimum acceptable premium, but it may not fill; a market order
+may fill faster but can suffer slippage.
+
+Use a documented price policy based on the live bid/ask and the desired
+execution urgency. Do not claim the midpoint is an executable price.
+
+Set a bounded order timeout and a clear cancel/replace policy. After
+cancellation, wait for the final order state and reconcile any fills
+before replacing an order.
+
+Coordinate the two legs with a defined two-leg execution policy. If one
+leg fills and the other does not within the allowed window, cancel the
+remainder and apply the unmatched-leg recovery procedure.
+
+Record the decision inputs: reference price, chosen strike/expiry, both
+bid/ask quotes, spread, quote timestamps, order type, limit price,
+quantity and reason for accepting the entry.
+
+20.4 Premium and risk discipline
+
+Use actual fill prices and actual filled quantities for entry premium. A
+quoted premium or submitted limit price is not realized credit.
+
+Use ask-side quotes to estimate the cost of buying back short options,
+exactly as the assignment specifies.
+
+Apply the contract multiplier and quote currency exactly once. Convert
+both legs to a common unit before adding them.
+
+Keep Level 2 thresholds fixed at 1% and 2% for assignment compliance. Do
+not widen the stop-loss or remove it to make a backtest appear more
+profitable.
+
+Include fees and realistic slippage in performance reporting. A gross
+premium gain can become a net loss after execution costs.
+
+Do not increase contract quantity or leverage simply to increase the
+displayed premium. Size must remain within the configured test quantity
+and account risk limits.
+
+20.5 What makes this approach stronger
+
+This is a quality-control and execution approach, not a claim of maximum
+profitability. A short straddle has significant downside risk: losses
+can become very large when BTC rises sharply, and a large fall can also
+create substantial losses. Premium received is not guaranteed profit.
+
+22. Strategy State Machine and Recovery Transitions
+
+Use one combined-strategy state plus independent Call and Put leg
+states. Transitions must be driven by confirmed order and position
+events, not by submission requests alone.
+
+21. Testing Evidence and Engineering Walkthrough Readiness
+
+The original assignment states that the engineering team values
+curiosity, initiative, problem-solving, ownership, communication and
+genuine understanding. The implementation should therefore include
+evidence of the work, not just source code.
+
+21.1 Walkthrough sequence
+
+Start by explaining the short ATM straddle and why the Call and Put
+share the same strike and expiry.
+
+Show the project structure, configuration and the NautilusTrader/Deribit
+initialization path.
+
+Show the instrument discovery output and BTC reference price used for
+ATM selection.
+
+Explain how the strategy receives quote events and how it validates
+quote freshness and spread.
+
+Show the two SELL orders and distinguish submission, acceptance and
+execution.
+
+Show actual fills, matched quantities, residual unmatched quantities if
+any, and open positions.
+
+For Level 2, demonstrate the combined premium calculation with test
+values and show the 1%/2% trigger conditions.
+
+Explain partial-fill handling, duplicate-exit prevention and restart
+reconciliation.
+
+Finish with test results, known limitations and the debugging work
+completed.
+
+State invariants: (1) only one entry cycle may be active; (2)
+acknowledgement is not a fill; (3) fills are accumulated idempotently;
+(4) unmatched exposure blocks new entries; (5) CLOSED requires zero
+positions on both legs and no relevant working orders; (6) after
+restart, enter RECONCILIATION_REQUIRED before resuming.
+
+23. Pre-Trade Account, Margin and Contract Validation
+
+Before submitting either SELL order, run a pre-trade validation gate.
+Use only account and instrument fields actually exposed by the installed
+Deribit integration and account mode; do not invent unavailable margin
+fields.
+
+Confirm both data and execution clients are connected to Deribit TestNet
+and authenticated.
+
+Confirm the account mode and options permissions support the selected
+BTC option instruments and order side.
+
+Retrieve available balance, margin or risk information exposed by the
+integration and verify that the proposed order is permitted.
+
+Check existing open orders and positions for both instrument IDs; block
+duplicate or conflicting entries.
+
+Validate active status, expiry, minimum quantity, lot size, tick size,
+price precision, quantity precision, multiplier, premium denomination
+and settlement currency.
+
+Confirm fresh bid/ask quotes for both legs and apply configured
+quote-age, spread and displayed-size rules.
+
+Validate the intended quantity against both legs’ trading increments and
+minimums.
+
+If a required account, margin, contract or market-data field is
+unavailable or invalid, block entry and log the reason rather than
+assuming validation passed.
+
+These checks reduce preventable errors but do not guarantee exchange
+acceptance or future margin sufficiency. Exchange-side validation and
+actual order responses remain authoritative.
+
+Scope decision: The strategy sells one BTC ATM Call and one BTC ATM Put
+with the same strike and expiry. A separate strategy that buys
+directional Calls or Puts is excluded from this core project.
+
+Level | Required behaviour | Exit behaviour
+
+Level 1 — Core | Connect to Deribit, subscribe to BTC options data,
+select matching ATM Call and Put, submit SELL orders, track orders and
+positions. | No automated stop-loss, take-profit or exit conditions.
+
+Level 2 — Advanced | Extend Level 1 with continuous combined-premium
+monitoring. | Close both legs at the specified 1% stop-loss or 2%
+take-profit thresholds.
+
+Risk note: A short straddle can incur substantial losses if BTC moves
+sharply. The Level 1 assignment explicitly has no automated stop-loss or
+take-profit. Use Deribit TestNet for development and demonstration; do
+not assume the strategy is suitable for live trading.
+
+Component | Responsibility
+
+NautilusTrader trading node | Initializes the trading environment,
+connects clients and runs the strategy.
+
+Deribit data client | Subscribes to the required BTC option market data
+and delivers market-data events.
+
+Instrument provider / instrument cache | Makes option instrument
+definitions available to the strategy.
+
+ATM selection logic | Uses a BTC reference price and available option
+strikes to select the nearest ATM strike.
+
+Straddle strategy | Selects the matching Call and Put, submits SELL
+orders and reacts to order/market events.
+
+Deribit execution client | Sends orders and receives order status and
+execution updates.
+
+Position and risk logic | Tracks filled positions; in Level 2, evaluates
+the combined buyback premium and exit thresholds.
+
+Logging and test layer | Records decisions, events, errors and test
+outcomes for debugging and walkthrough.
+
+Setting | Purpose
+
+Environment | Deribit TestNet for development and demonstration.
+
+Underlying reference | The BTC reference-price source used for ATM
+selection; document the chosen source.
+
+Option universe | BTC options eligible for the selected underlying and
+trading category.
+
+Expiry policy | A deterministic rule for choosing an expiry available
+for both Call and Put.
+
+Order quantity | A configured quantity that satisfies the instrument’s
+lot-size and minimum-quantity rules.
+
+Level | Level 1 or Level 2; Level 1 must not activate automated exits.
+
+Risk thresholds | Level 2: 1% stop-loss and 2% take-profit.
+
+Data | Why it is needed
+
+BTC underlying reference price | Determine which available option strike
+is nearest to ATM.
+
+BTC option instrument definitions | Read option identity, Call/Put type,
+strike, expiry and trading constraints.
+
+Call and Put quotes | Observe market prices and, in Level 2, estimate
+the cost to buy back both short legs.
+
+Order and execution events | Determine whether each order was accepted,
+rejected, partially filled or fully filled.
+
+Position state | Confirm the actual open quantity for each option leg
+and verify closure.
+
+Important addition: The assignment specifies that Call and Put must
+share the same strike and expiry, but it does not prescribe a particular
+expiry. The implementation must document its expiry-selection policy
+instead of silently choosing unrelated contracts.
+
+Level 1 rule: Do not activate automated stop-loss, take-profit or
+automated exit conditions in Level 1. This is explicitly stated in the
+assignment.
+
+State / event | Meaning | Strategy response
+
+Submitted | The strategy has sent an order request. | Wait for the
+execution system’s response; do not treat it as a fill.
+
+Accepted | The exchange or execution system has acknowledged the order.
+| Continue tracking; the position may still be zero.
+
+Partially filled | Some, but not all, requested quantity has executed. |
+Update filled quantity and average fill price; handle remaining quantity
+according to the recovery policy.
+
+Filled | The requested quantity has executed. | Update position and
+entry premium from execution reports.
+
+Rejected | The order was not accepted for execution. | Record the reason
+and prevent the strategy from assuming a position exists.
+
+Cancel / cancel rejected | An order cancellation was requested or
+failed. | Reconcile the final order and position state before taking
+further action.
+
+Closed position | The short quantity has been bought back or otherwise
+closed. | Verify the remaining position quantity is zero.
+
+Parameter | Trigger | Action
+
+Stop-loss | Combined buyback premium increases by 1% from combined entry
+premium. | Buy back and close the open Call and Put positions.
+
+Take-profit | Combined buyback premium decreases by 2% from combined
+entry premium. | Buy back and close the open Call and Put positions.
+
+Test | Expected result
+
+ATM selection | Chooses the eligible strike nearest to the reference
+price.
+
+Matching contracts | Selected Call and Put have identical strike and
+expiry.
+
+Missing pair | Does not submit orders if a valid matching pair is
+unavailable.
+
+Invalid instrument quantity | Blocks order submission when quantity
+violates instrument constraints.
+
+Order accepted but not filled | Does not count an open position or entry
+premium until execution occurs.
+
+Partial entry fill | Tracks actual filled quantity and average fill
+price for each leg.
+
+Rejected leg | Triggers the documented unmatched-leg recovery policy.
+
+Level 1 mode | Does not trigger automated SL/TP exits.
+
+Level 2 stop-loss | Triggers when B is at least E × 1.01.
+
+Level 2 take-profit | Triggers when B is at most E × 0.98.
+
+Stale or missing quote | Does not use invalid quote data to trigger a
+normal valuation decision.
+
+Duplicate exit prevention | Does not create duplicate closing orders
+while an exit is in progress.
+
+Exit completion | Confirms both remaining positions are zero before
+marking the strategy closed.
+
+Trading safety: This is an educational TestNet implementation. Do not
+enable live trading as part of the assignment unless explicitly
+authorised and separately risk-reviewed.
+
+Phase | Work | Completion check
+
+1.  Environment | Create project, virtual environment, compatible
+    dependencies and basic logging. | Application imports and starts
+    without dependency errors.
+
+2.  Deribit connection | Configure Deribit TestNet data and execution
+    clients. | Connection is established and logged.
+
+3.  Market data | Subscribe to BTC reference data and BTC option data. |
+    Fresh data events are received.
+
+4.  Instrument selection | Discover instruments and select a matching
+    ATM Call/Put pair. | Strike and expiry match and constraints are
+    validated.
+
+5.  Level 1 strategy | Submit SELL orders and track order and position
+    events. | TestNet run demonstrates the Level 1 flow without
+    automated exits.
+
+6.  Execution robustness | Handle partial fills, rejected orders and
+    unmatched legs. | Recovery behaviour is tested and positions
+    reconcile correctly.
+
+7.  Level 2 risk | Calculate combined buyback premium and implement 1%
+    SL / 2% TP. | Threshold tests pass and closing orders are tracked.
+
+8.  Final validation | Run unit/integration tests and prepare
+    walkthrough evidence. | Results and known limitations are
+    documented.
+
+Deribit TestNet market-data stream / -> NautilusTrader Deribit data
+client / -> NautilusTrader market-data processing / -> subscribed
+instrument / quote event / -> strategy event handler / -> update latest
+BTC reference and option bid/ask state / -> validate timestamp,
+freshness, spread and quote size / -> ATM selector / risk monitor
+consumes the validated state
+
+Strategy creates SELL order / -> execution client submits to Deribit
+TestNet / -> order submitted / accepted / rejected event / ->
+partial-fill or fill event(s) / -> order manager updates cumulative
+filled quantity / -> position tracker reconciles actual open position /
+-> strategy state changes only after verified events
+
+qC = actual open short Call quantity / qP = actual open short Put
+quantity / qMatched = min(qC, qP) / / Only qMatched on each leg forms
+the matched straddle quantity. / Residual Call quantity = qC - qMatched
+/ Residual Put quantity = qP - qMatched
+
+For matched quantity qMatched: / / E = (Call entry fill value for
+qMatched) / + (Put entry fill value for qMatched) / / B = (Call ask-side
+buyback value for qMatched) / + (Put ask-side buyback value for
+qMatched) / / Apply each instrument’s contract multiplier and premium
+denomination. / Convert both legs to the same currency and consistent
+units before comparison.
+
+Leg | Actual filled/open quantity | Matched quantity | Unmatched
+residual
+
+Call | 3 contracts | 2 contracts | 1 contract
+
+Put | 2 contracts | 2 contracts | 0 contracts
+
+Quality check | Method | Reason
+
+Quote freshness | Require recent bid/ask updates for both legs within a
+configured age limit. | Avoid trading on stale prices.
+
+Bid-ask spread | Calculate spread and spread as a proportion of the
+midpoint; reject abnormally wide markets using a documented threshold. |
+Reduce hidden entry and exit costs.
+
+Available quote size | Check displayed size against the intended order
+size where the feed provides it. | Reduce avoidable partial fills and
+market impact.
+
+Tradability | Confirm active instrument, future expiry, minimum
+quantity, lot size and tick size. | Avoid rejected or invalid orders.
+
+Pair integrity | Confirm same underlying, strike, expiry and compatible
+contract specifications. | Ensure it is the required straddle.
+
+Estimated net credit | Estimate sell-side entry proceeds from executable
+bid-side prices, then account for expected fees and spread costs. |
+Understand the realistic premium rather than relying on midpoint marks.
+
+Account readiness | Check connection, open orders, current positions and
+available margin/risk information where exposed. | Avoid duplicate
+entries or preventable rejections.
+
+Approach | Potential benefit | Trade-off / limitation
+
+Nearest-ATM pair with strict validation | Maintains assignment
+compliance and avoids invalid contract pairing. | May skip a trade if
+the required pair is illiquid.
+
+Spread and quote-size filters | Avoids entering when execution costs or
+liquidity are poor. | Fewer trade opportunities.
+
+Controlled limit execution | Can reduce slippage and set a minimum
+acceptable credit. | Orders may remain unfilled or only partially fill.
+
+Matched-quantity monitoring | Measures the intended paired exposure
+correctly. | Requires careful partial-fill and recovery logic.
+
+Fixed assignment SL/TP | Makes Level 2 behavior clear, testable and
+reviewable. | Does not guarantee a capped loss or exact exit price
+during fast markets.
+
+Evidence to prepare | What it demonstrates
+
+Environment/version record | You can explain how NautilusTrader was
+installed and which release was used.
+
+TestNet connection log | Deribit integration was configured and the
+intended environment was used.
+
+Instrument selection log | BTC reference price, eligible strikes,
+selected expiry and ATM pair are transparent.
+
+Order lifecycle log | Submitted, accepted, rejected, partial and filled
+states are understood.
+
+Position reconciliation | Actual positions match the recorded fills and
+exchange state.
+
+Risk calculation test output | The 1% and 2% thresholds work with
+matched quantities and ask-side quotes.
+
+Failure/debugging notes | You can explain errors, investigation steps,
+fixes and remaining limitations.
+
+Final TestNet account check | No unintended open orders or positions
+remain after the demonstration.
+
+State | Meaning | Allowed next action / transition
+
+IDLE | No active strategy, unresolved order or position. | Validate
+account and market data; move to READY.
+
+READY | Pre-trade checks passed and a matched ATM pair is selected. |
+Submit entry orders; move to ENTRY_WORKING.
+
+ENTRY_WORKING | One or both entry orders are pending. | Process
+acknowledgements and fills; block duplicate entry.
+
+OPEN | Both legs have equal matched open quantities and no unresolved
+entry orders. | Level 1: monitor only. Level 2: monitor combined buyback
+value.
+
+PARTIALLY_OPEN | Entry has partially filled or leg quantities are
+unequal. | Cancel/reconcile remaining entry orders and resolve residual
+exposure.
+
+UNMATCHED_EXPOSURE | One leg has excess open quantity or the other leg
+is missing. | Close/reduce residual under recovery policy; block new
+entries.
+
+RECONCILIATION_REQUIRED | Local state differs from venue state or a
+reconnect/restart occurred. | Pause new entries; query venue orders and
+positions and reconcile.
+
+EXITING | A Level 2 trigger or recovery action has initiated close
+orders. | Lock duplicate triggers and track close fills.
+
+EXIT_PARTIALLY_FILLED | One or both close orders are partially executed.
+| Recalculate residual open quantities and close only verified
+residuals.
+
+CLOSED | Both legs have zero open quantity and no relevant working
+orders. | Archive cycle; permit a new entry only after fresh validation.
+
+ERROR | An unresolved or non-recoverable failure occurred. | Block new
+entries and require controlled recovery/manual review.

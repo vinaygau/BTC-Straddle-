@@ -1,0 +1,33 @@
+# Python environments and caches
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# Generated output
+logs/
+*.log
+data/raw/
+data/processed/
+data/reports/
+data/cache/
+.runtime/
+
+# Locally downloaded packages, training artifacts, and generated market data
+tmp/
+*.whl
+*.parquet
+*.npz
+*.pt
+*.joblib
+
+# Office lock and temporary files
+~$*

@@ -1,0 +1,33 @@
+{
+  "optimizer": {
+    "strategy": "short_straddle",
+    "require_same_strike": true,
+    "require_same_expiry": true,
+    "require_both_legs": true,
+    "allow_atm": true,
+    "allow_itm": true,
+    "allow_otm": true,
+    "max_strike_distance_fraction": 0.02,
+    "require_expiry_scenarios": true,
+    "minimum_scenario_count": 1000,
+    "minimum_historical_samples": 25,
+    "require_fresh_quotes": true,
+    "require_liquidity_check": true,
+    "use_cvar": true,
+    "cvar_confidence": 0.95,
+    "cvar_penalty_lambda": 1.0,
+    "maximum_loss_btc": null,
+    "maximum_margin_btc": null,
+    "maximum_margin_fraction": null,
+    "fee_rate_per_side": 0.0,
+    "slippage_rate_per_side": 0.0,
+    "minimum_bid_size_contracts": 0.0,
+    "maximum_spread_fraction": null,
+    "no_trade_if_constraints_fail": true,
+    "selection_risk_thresholds": {
+      "max_probability_of_loss": 0.25,
+      "max_cvar_to_entry_credit": 0.5,
+      "max_worst_sampled_loss_to_entry_credit": 2.0
+    }
+  }
+}

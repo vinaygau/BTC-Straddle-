@@ -1,0 +1,11 @@
+{
+  "candlestick": {
+    "lookback": 20,
+    "range_expansion_ratio": 2.0,
+    "volume_spike_ratio": 1.5,
+    "directional_move_threshold": 0.0075,
+    "veto_risk_score": 2,
+    "analyzed_timeframes": ["5m", "15m", "1h", "daily"],
+    "closed_candles_only": true
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "paper_trading": {
+    "enabled": true,
+    "execution": {
+      "allow_partial_fills": true,
+      "require_both_legs": true
+    },
+    "quote_validation": {
+      "maximum_quote_age_seconds": 5,
+      "require_valid_bid_ask": true,
+      "require_sufficient_liquidity": true
+    },
+    "risk": {
+      "stop_loss_enabled": true,
+      "stop_loss_method": "percentage_of_entry_credit",
+      "stop_loss_percentage": 20.0,
+      "take_profit_enabled": true,
+      "take_profit_percentage": 30.0
+    },
+    "accounting": {
+      "fee_model": "deribit_option_standard_tier_estimate",
+      "fee_rate_per_side": 0.0003,
+      "fee_cap_percent_of_premium": 12.5,
+      "slippage_rate_per_side": 0.0,
+      "include_entry_fees": true,
+      "include_exit_fees": true,
+      "include_slippage": true
+    },
+    "expiry": {
+      "validate_expiry": true,
+      "settlement_enabled": false
+    },
+    "storage": {
+      "sqlite_path": ".runtime/paper_trading.sqlite3"
+    }
+  }
+}

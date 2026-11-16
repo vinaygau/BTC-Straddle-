@@ -1,0 +1,16 @@
+{
+  "scenario": {
+    "simulation_count": 1000,
+    "minimum_simulations": 1000,
+    "maximum_simulations": 2000,
+    "random_seed": 42,
+    "bootstrap_method": "moving_block",
+    "block_length": 12,
+    "minimum_historical_samples": 25,
+    "preserve_return_sequences": true,
+    "regime_conditioning": true,
+    "use_model_forecast": true,
+    "extreme_move_threshold": 0.01,
+    "quantiles": [0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95]
+  }
+}

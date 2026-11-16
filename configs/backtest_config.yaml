@@ -1,0 +1,16 @@
+{
+  "backtest": {
+    "strategies": [
+      "nearest_atm_short_straddle",
+      "existing_dynamic_pair_ranking",
+      "historical_scenario_dynamic_strike",
+      "hybrid_forecast_plus_historical_scenario"
+    ],
+    "require_common_evaluation_dates": true,
+    "require_out_of_fold_predictions": true,
+    "require_historical_bid_ask_for_executable_claims": true,
+    "require_non_overlapping_positions_for_equity_metrics": true,
+    "default_fee_rate": 0.0,
+    "default_slippage_rate": 0.0
+  }
+}
