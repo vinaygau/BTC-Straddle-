@@ -86,15 +86,16 @@ def train_models(feature_path: str | Path, output_dir: str | Path,
         from torch.utils.data import DataLoader, TensorDataset
     except ImportError as exc:
         raise RuntimeError(
-            "Model training requires optional packages. Install with: "
-            "python -m pip install -r requirements-ml.txt"
+            "Model training dependencies are missing. Install the project "
+            "environment with: python -m pip install -r requirements.txt"
         ) from exc
     if include_xgboost:
         try:
             from xgboost import XGBClassifier, XGBRegressor
         except ImportError as exc:
             raise RuntimeError(
-                "XGBoost is unavailable. Install it from requirements-ml.txt or "
+                "XGBoost is unavailable. Install the project dependencies from "
+                "requirements.txt or "
                 "rerun with --lstm-only for an explicitly LSTM-only research pass."
             ) from exc
 

@@ -1,5 +1,16 @@
-# Pinned direct runtime dependencies.
+# One pinned environment for the Streamlit application and offline BTC research.
+# Target: 64-bit CPython 3.12 on Windows.
+
+# Streamlit UI and exchange runtime
 nautilus_trader==1.231.0
 python-dotenv==1.2.4
 streamlit==1.67.0
 websockets==17.4
+
+# Market data, feature pipeline, and CPU model training/inference
+numpy==2.5.4
+pandas==3.1.1
+pyarrow==26.0.1
+scikit-learn==1.9.1
+torch==2.15.0
+xgboost-cpu==3.4.1
