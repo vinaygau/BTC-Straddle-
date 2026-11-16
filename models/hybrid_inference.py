@@ -28,7 +28,7 @@ class HybridMarketPredictionProvider(MarketPredictionProvider):
         directory = Path(artifact_dir)
         report_path = directory / "training_report.json"
         if not report_path.is_file():
-            raise FileNotFoundError(f"Missing hybrid training report in {directory}")
+            raise FileNotFoundError("Missing hybrid training report (training_report.json).")
         report = json.loads(report_path.read_text(encoding="utf-8"))
         if report.get("model_mode") != "hybrid":
             raise ValueError("Artifacts are not from a completed hybrid training run.")
@@ -48,7 +48,7 @@ class HybridMarketPredictionProvider(MarketPredictionProvider):
         for name in ("return", "volatility", "direction", "extreme"):
             path = directory / f"xgboost_{name}.json"
             if not path.is_file():
-                raise FileNotFoundError(f"Missing XGBoost {name} model: {path}")
+                raise FileNotFoundError(f"Missing XGBoost {name} inference artifact.")
             booster = xgb.Booster()
             booster.load_model(path)
             self._boosters[name] = booster

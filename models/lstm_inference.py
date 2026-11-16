@@ -31,7 +31,9 @@ class LSTMMarketPredictionProvider(MarketPredictionProvider):
         scaler_path = artifact_dir / "feature_scaler.npz"
         checkpoint_path = artifact_dir / "lstm_multitask.pt"
         if not scaler_path.is_file() or not checkpoint_path.is_file():
-            raise FileNotFoundError(f"Missing LSTM model or scaler in {artifact_dir}")
+            raise FileNotFoundError(
+                "Missing LSTM inference artifacts (lstm_multitask.pt and feature_scaler.npz)."
+            )
 
         with np.load(scaler_path, allow_pickle=False) as scaler:
             self._mean = scaler["mean"].astype(np.float64)

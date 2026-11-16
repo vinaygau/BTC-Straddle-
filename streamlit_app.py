@@ -1520,9 +1520,25 @@ def render_live_quotes_panel() -> None:
                     }
                     st.session_state.pop("selected_pair_risk_error", None)
                 except Exception as exc:
+                    message = str(exc)
+                    if isinstance(exc, FileNotFoundError) and any(
+                        marker in message.lower()
+                        for marker in ("lstm inference artifacts", "xgboost", "hybrid training report")
+                    ):
+                        message = (
+                            "The trained BTC model files are not included in this deployment. "
+                            "Add the model artifacts under data/processed/model_artifacts/ and redeploy. "
+                            "No risk estimate was generated."
+                        )
+                    elif isinstance(exc, FileNotFoundError) and "prepared btc feature history" in message.lower():
+                        message = (
+                            "Prepared BTC history is not included in this deployment. Add the processed "
+                            "BTC candle and feature data under data/processed/ and redeploy. "
+                            "No risk estimate was generated."
+                        )
                     st.session_state["selected_pair_risk_error"] = {
                         "key": risk_key,
-                        "message": str(exc),
+                        "message": message,
                     }
 
         risk_cache = st.session_state.get("selected_pair_risk_cache")
@@ -1615,10 +1631,11 @@ def render_live_quotes_panel() -> None:
                     }
                     st.rerun()
         else:
-            st.info("Risk has not been calculated for this pair in the current session. Select Calculate / refresh risk to run the expiry analysis.")
             risk_error = st.session_state.get("selected_pair_risk_error")
             if risk_error is not None and risk_error.get("key") == risk_key:
-                st.error(risk_error["message"], title="Selected-pair risk unavailable")
+                st.error(risk_error["message"], title="Risk unavailable")
+            else:
+                st.info("Select Calculate / refresh risk to run the expiry analysis for this pair.")
 
     pair_key = (call_contract.instrument_id, put_contract.instrument_id)
     if st.session_state.get("history_pair") != pair_key:
