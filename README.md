@@ -47,11 +47,18 @@ BTC_Options_Straddle/
 ├── scripts/                  # Data, training, and analysis commands
 ├── tests/                    # Automated checks
 ├── docs/                     # Guides, audits, and project report
+├── deployment_assets/        # Curated inference bundle and 365-day scenario history
 ├── runtime.py                # Shared app runtime services
 └── main.py                   # Legacy CLI runtime entrypoint
 ```
 
-Generated data, model artifacts, reports, local wheels, runtime state, and secrets are excluded from Git. A fresh checkout therefore needs prepared datasets and promoted model artifacts for model-backed analysis; the app should identify unavailable model/data inputs instead of treating them as live forecasts.
+Raw downloads, full processed datasets, reports, local wheels, runtime state, and secrets are excluded from Git. The small, curated `deployment_assets/` inference bundle and 365-day public BTC scenario-history snapshot are versioned so Streamlit deployments can run model-backed risk analysis. Rebuild this bundle after promoting new model weights or refreshing the research history:
+
+```powershell
+python -m scripts.package_streamlit_assets
+```
+
+The app prefers full local data under `data/processed/` and falls back to `deployment_assets/` when running from a deployment checkout.
 
 ## Research workflow
 

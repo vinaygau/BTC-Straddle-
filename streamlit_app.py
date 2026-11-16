@@ -332,7 +332,21 @@ def _cached_ollama_models() -> tuple[list[str], str | None]:
 def _hybrid_model_provider() -> HybridMarketPredictionProvider:
     """Load the offline-trained hybrid model once per Streamlit process."""
     config = DataPipelineConfig()
-    return HybridMarketPredictionProvider(config.processed_dir / "model_artifacts", device="cpu")
+    local_artifacts = config.processed_dir / "model_artifacts"
+    deployment_artifacts = Path(__file__).resolve().parent / "deployment_assets" / "model_artifacts"
+    required_files = (
+        "feature_scaler.npz",
+        "lstm_multitask.pt",
+        "training_report.json",
+        "xgboost_return.json",
+        "xgboost_volatility.json",
+        "xgboost_direction.json",
+        "xgboost_extreme.json",
+    )
+    for artifact_dir in (local_artifacts, deployment_artifacts):
+        if all((artifact_dir / name).is_file() for name in required_files):
+            return HybridMarketPredictionProvider(artifact_dir, device="cpu")
+    return HybridMarketPredictionProvider(local_artifacts, device="cpu")
 
 
 def _validate_live_prediction_freshness(as_of_utc: str) -> float:
@@ -379,6 +393,11 @@ def _cached_historical_research_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     config = DataPipelineConfig()
     feature_path = config.processed_dir / "btc_multitimeframe_features.parquet"
     candle_path = config.processed_dir / "btc_5m.parquet"
+    deployment_history = Path(__file__).resolve().parent / "deployment_assets" / "research_history"
+    if not feature_path.is_file():
+        feature_path = deployment_history / "btc_multitimeframe_features.parquet"
+    if not candle_path.is_file():
+        candle_path = deployment_history / "btc_5m.parquet"
     if not feature_path.is_file() or not candle_path.is_file():
         raise FileNotFoundError("Prepared BTC feature history and 5m candle data are required for scenario research.")
     feature_columns = ["prediction_time_utc", "5m_close", *REGIME_FEATURES]
@@ -1527,13 +1546,13 @@ def render_live_quotes_panel() -> None:
                     ):
                         message = (
                             "The trained BTC model files are not included in this deployment. "
-                            "Add the model artifacts under data/processed/model_artifacts/ and redeploy. "
+                            "Add the files under deployment_assets/model_artifacts/ and redeploy. "
                             "No risk estimate was generated."
                         )
                     elif isinstance(exc, FileNotFoundError) and "prepared btc feature history" in message.lower():
                         message = (
                             "Prepared BTC history is not included in this deployment. Add the processed "
-                            "BTC candle and feature data under data/processed/ and redeploy. "
+                            "BTC candle and feature files under deployment_assets/research_history/ and redeploy. "
                             "No risk estimate was generated."
                         )
                     st.session_state["selected_pair_risk_error"] = {

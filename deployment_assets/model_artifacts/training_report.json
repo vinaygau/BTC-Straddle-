@@ -1,0 +1,210 @@
+{
+  "scope": "research only; forecasts support advisory option ranking and are not submitted as orders",
+  "feature_path": "C:\\Users\\vinay\\OneDrive\\Documents\\Finance\\Test Cases\\RAVAN AI\\BTC_Options_Straddle\\data\\processed\\btc_multitimeframe_features.parquet",
+  "feature_count": 104,
+  "feature_columns": [
+    "5m_log_return_1",
+    "5m_body_return",
+    "5m_range_pct",
+    "5m_body_to_range",
+    "5m_upper_wick_to_range",
+    "5m_lower_wick_to_range",
+    "5m_momentum_return_1",
+    "5m_momentum_return_3",
+    "5m_momentum_return_6",
+    "5m_momentum_return_12",
+    "5m_momentum_return_24",
+    "5m_realized_volatility_6",
+    "5m_realized_volatility_12",
+    "5m_realized_volatility_24",
+    "5m_realized_volatility_48",
+    "5m_volume_log1p",
+    "5m_volume_change_1",
+    "5m_volume_zscore_24",
+    "5m_quote_volume_log1p",
+    "5m_trade_count_change_1",
+    "5m_taker_buy_base_ratio",
+    "5m_taker_buy_quote_ratio",
+    "5m_utc_hour_sin",
+    "5m_utc_hour_cos",
+    "5m_utc_weekday_sin",
+    "5m_utc_weekday_cos",
+    "15m_log_return_1",
+    "15m_body_return",
+    "15m_range_pct",
+    "15m_body_to_range",
+    "15m_upper_wick_to_range",
+    "15m_lower_wick_to_range",
+    "15m_momentum_return_1",
+    "15m_momentum_return_3",
+    "15m_momentum_return_6",
+    "15m_momentum_return_12",
+    "15m_momentum_return_24",
+    "15m_realized_volatility_6",
+    "15m_realized_volatility_12",
+    "15m_realized_volatility_24",
+    "15m_realized_volatility_48",
+    "15m_volume_log1p",
+    "15m_volume_change_1",
+    "15m_volume_zscore_24",
+    "15m_quote_volume_log1p",
+    "15m_trade_count_change_1",
+    "15m_taker_buy_base_ratio",
+    "15m_taker_buy_quote_ratio",
+    "15m_utc_hour_sin",
+    "15m_utc_hour_cos",
+    "15m_utc_weekday_sin",
+    "15m_utc_weekday_cos",
+    "1h_log_return_1",
+    "1h_body_return",
+    "1h_range_pct",
+    "1h_body_to_range",
+    "1h_upper_wick_to_range",
+    "1h_lower_wick_to_range",
+    "1h_momentum_return_1",
+    "1h_momentum_return_3",
+    "1h_momentum_return_6",
+    "1h_momentum_return_12",
+    "1h_momentum_return_24",
+    "1h_realized_volatility_6",
+    "1h_realized_volatility_12",
+    "1h_realized_volatility_24",
+    "1h_realized_volatility_48",
+    "1h_volume_log1p",
+    "1h_volume_change_1",
+    "1h_volume_zscore_24",
+    "1h_quote_volume_log1p",
+    "1h_trade_count_change_1",
+    "1h_taker_buy_base_ratio",
+    "1h_taker_buy_quote_ratio",
+    "1h_utc_hour_sin",
+    "1h_utc_hour_cos",
+    "1h_utc_weekday_sin",
+    "1h_utc_weekday_cos",
+    "daily_log_return_1",
+    "daily_body_return",
+    "daily_range_pct",
+    "daily_body_to_range",
+    "daily_upper_wick_to_range",
+    "daily_lower_wick_to_range",
+    "daily_momentum_return_1",
+    "daily_momentum_return_3",
+    "daily_momentum_return_6",
+    "daily_momentum_return_12",
+    "daily_momentum_return_24",
+    "daily_realized_volatility_6",
+    "daily_realized_volatility_12",
+    "daily_realized_volatility_24",
+    "daily_realized_volatility_48",
+    "daily_volume_log1p",
+    "daily_volume_change_1",
+    "daily_volume_zscore_24",
+    "daily_quote_volume_log1p",
+    "daily_trade_count_change_1",
+    "daily_taker_buy_base_ratio",
+    "daily_taker_buy_quote_ratio",
+    "daily_utc_hour_sin",
+    "daily_utc_hour_cos",
+    "daily_utc_weekday_sin",
+    "daily_utc_weekday_cos"
+  ],
+  "horizon_steps": 12,
+  "sequence_length": 48,
+  "sequence_stride": 12,
+  "model_mode": "hybrid",
+  "target_scaling": {
+    "return_mean": 9.453325037611648e-05,
+    "return_scale": 0.004970615264028311,
+    "volatility_mean": 0.0011221298482269049,
+    "volatility_scale": 0.000871867872774601,
+    "fit_split": "train"
+  },
+  "direction_threshold": 0.0025,
+  "extreme_move_threshold": 0.01,
+  "splits": {
+    "train": {
+      "rows": 284930,
+      "first": "2023-01-01T23:59:59.999000+00:00",
+      "last": "2025-09-17T12:29:59.999000+00:00"
+    },
+    "validation": {
+      "rows": 61047,
+      "first": "2025-09-17T13:34:59.999000+00:00",
+      "last": "2026-04-17T12:44:59.999000+00:00"
+    },
+    "test": {
+      "rows": 61060,
+      "first": "2026-04-17T13:49:59.999000+00:00",
+      "last": "2026-11-15T14:04:59.999000+00:00"
+    }
+  },
+  "xgboost_training_rows": 23745,
+  "baseline_metrics": {
+    "zero_return": {
+      "mae": 0.002639701124280691,
+      "rmse": 0.004042148124426603
+    },
+    "train_mean_return": {
+      "mae": 0.0026410201098769903,
+      "rmse": 0.004043865483254194
+    },
+    "train_mean_volatility": {
+      "mae": 0.0005087053286843002,
+      "rmse": 0.0006561795598827302
+    },
+    "train_class_prior_direction": {
+      "accuracy": 0.6360778148948713,
+      "log_loss": 0.9119542939743365
+    },
+    "train_class_prior_extreme": {
+      "accuracy": 0.9707211632933779,
+      "log_loss": 0.13728686808513804
+    }
+  },
+  "validation_blend_weights": {
+    "xgboost": 0.49330973456613575,
+    "lstm": 0.5066902654338643
+  },
+  "return_quantile_residual_offsets": [
+    -0.005137911698607179,
+    4.053210645009712e-05,
+    0.004924788038021636
+  ],
+  "test_metrics": {
+    "xgboost_return": {
+      "mae": 0.0026741735637187958,
+      "rmse": 0.004092761315405369
+    },
+    "lstm_return": {
+      "mae": 0.002641750266775489,
+      "rmse": 0.004041139502078295
+    },
+    "hybrid_return": {
+      "mae": 0.002644562788171791,
+      "rmse": 0.0040487110901967155
+    },
+    "hybrid_volatility": {
+      "mae": 0.00028172737088964957,
+      "rmse": 0.0004405181992027664
+    },
+    "hybrid_direction": {
+      "accuracy": 0.6376498329730792,
+      "log_loss": 0.8474331434152884
+    },
+    "hybrid_extreme": {
+      "accuracy": 0.9707211632933779,
+      "log_loss": 0.1108399091582601
+    }
+  },
+  "lstm_device": "cpu",
+  "training_rows_with_sequences": 23737,
+  "validation_rows_with_sequences": 5088,
+  "test_rows_with_sequences": 5089,
+  "training_config": {
+    "random_seed": 42,
+    "lstm_epochs_max": 20,
+    "lstm_batch_size": 256,
+    "xgboost_estimators": 300,
+    "sequence_stride": 12
+  }
+}

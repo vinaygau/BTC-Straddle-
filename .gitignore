@@ -28,5 +28,11 @@ tmp/
 *.pt
 *.joblib
 
+# Curated inference bundle and bounded public candle history used by Streamlit deploys
+!deployment_assets/
+!deployment_assets/**/*.parquet
+!deployment_assets/**/*.npz
+!deployment_assets/**/*.pt
+
 # Office lock and temporary files
 ~$*
